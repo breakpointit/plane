@@ -46,6 +46,15 @@ from .views import (
     GiteaOauthInitiateSpaceEndpoint,
 )
 
+# Microsoft Entra ID (fork addition). Kept as its own import statement rather than
+# folded into the tuple above so upstream changes to that tuple merge cleanly.
+from .views import (
+    MicrosoftCallbackEndpoint,
+    MicrosoftCallbackSpaceEndpoint,
+    MicrosoftOauthInitiateEndpoint,
+    MicrosoftOauthInitiateSpaceEndpoint,
+)
+
 urlpatterns = [
     # credentials
     path("sign-in/", SignInAuthEndpoint.as_view(), name="sign-in"),
@@ -149,5 +158,22 @@ urlpatterns = [
         "spaces/gitea/callback/",
         GiteaCallbackSpaceEndpoint.as_view(),
         name="space-gitea-callback",
+    ),
+    ## Microsoft Entra ID Oauth (fork addition; appended last to keep merges clean)
+    path("microsoft/", MicrosoftOauthInitiateEndpoint.as_view(), name="microsoft-initiate"),
+    path(
+        "microsoft/callback/",
+        MicrosoftCallbackEndpoint.as_view(),
+        name="microsoft-callback",
+    ),
+    path(
+        "spaces/microsoft/",
+        MicrosoftOauthInitiateSpaceEndpoint.as_view(),
+        name="space-microsoft-initiate",
+    ),
+    path(
+        "spaces/microsoft/callback/",
+        MicrosoftCallbackSpaceEndpoint.as_view(),
+        name="space-microsoft-callback",
     ),
 ]

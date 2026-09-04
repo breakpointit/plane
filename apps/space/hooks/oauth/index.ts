@@ -9,12 +9,21 @@ import type { TOAuthConfigs } from "@plane/types";
 // local imports
 import { useCoreOAuthConfig } from "./core";
 import { useExtendedOAuthConfig } from "./extended";
+import { useMicrosoftOAuthConfig } from "./microsoft";
 
 export const useOAuthConfig = (oauthActionText: string = "Continue"): TOAuthConfigs => {
   const coreOAuthConfig = useCoreOAuthConfig(oauthActionText);
   const extendedOAuthConfig = useExtendedOAuthConfig(oauthActionText);
+  // Microsoft Entra ID (fork addition), merged in as a third source so `core.tsx`
+  // stays byte-identical to upstream.
+  const microsoftOAuthConfig = useMicrosoftOAuthConfig(oauthActionText);
   return {
-    isOAuthEnabled: coreOAuthConfig.isOAuthEnabled || extendedOAuthConfig.isOAuthEnabled,
-    oAuthOptions: [...coreOAuthConfig.oAuthOptions, ...extendedOAuthConfig.oAuthOptions],
+    isOAuthEnabled:
+      coreOAuthConfig.isOAuthEnabled || extendedOAuthConfig.isOAuthEnabled || microsoftOAuthConfig.isOAuthEnabled,
+    oAuthOptions: [
+      ...coreOAuthConfig.oAuthOptions,
+      ...extendedOAuthConfig.oAuthOptions,
+      ...microsoftOAuthConfig.oAuthOptions,
+    ],
   };
 };

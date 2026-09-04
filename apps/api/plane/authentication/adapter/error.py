@@ -73,6 +73,9 @@ AUTHENTICATION_ERROR_CODES = {
     "RATE_LIMIT_EXCEEDED": 5900,
     # Unknown
     "AUTHENTICATION_FAILED": 5999,
+    # Microsoft Entra ID (fork addition; appended here so upstream merges stay clean)
+    "MICROSOFT_NOT_CONFIGURED": 5113,
+    "MICROSOFT_OAUTH_PROVIDER_ERROR": 5114,
 }
 
 

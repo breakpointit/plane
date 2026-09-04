@@ -6,6 +6,7 @@
 
 import type { TInstanceAuthenticationModes } from "@plane/types";
 import { getCoreAuthenticationModesMap } from "./core";
+import { getMicrosoftAuthenticationMode } from "./microsoft";
 import type { TGetAuthenticationModeProps } from "./types";
 
 export const useAuthenticationModes = (props: TGetAuthenticationModeProps): TInstanceAuthenticationModes[] => {
@@ -19,6 +20,8 @@ export const useAuthenticationModes = (props: TGetAuthenticationModeProps): TIns
     authenticationModes["github"],
     authenticationModes["gitlab"],
     authenticationModes["gitea"],
+    // Microsoft Entra ID (fork addition)
+    getMicrosoftAuthenticationMode(props),
   ];
 
   return availableAuthenticationModes;

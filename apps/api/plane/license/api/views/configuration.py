@@ -25,6 +25,10 @@ from plane.license.api.permissions import InstanceAdminPermission
 from plane.license.models import InstanceConfiguration
 from plane.license.api.serializers import InstanceConfigurationSerializer
 from plane.license.utils.encryption import encrypt_data
+from plane.license.utils.masked_configuration import (
+    is_masked_value,
+    validate_microsoft_configuration,
+)
 from plane.utils.cache import cache_response, invalidate_cache
 from plane.license.utils.instance_value import get_email_configuration
 
@@ -41,10 +45,21 @@ class InstanceConfigurationEndpoint(BaseAPIView):
     @invalidate_cache(path="/api/instances/configurations/", user=False)
     @invalidate_cache(path="/api/instances/", user=False)
     def patch(self, request):
+        # Backend validation is mandatory: an authentication provider must never be
+        # enabled through the API with missing or malformed credentials, whatever
+        # the client sends (fork addition; scoped to the Microsoft keys).
+        validation_error = validate_microsoft_configuration(request.data)
+        if validation_error:
+            return Response({"error": validation_error}, status=status.HTTP_400_BAD_REQUEST)
+
         configurations = InstanceConfiguration.objects.filter(key__in=request.data.keys())
 
         bulk_configurations = []
         for configuration in configurations:
+            # A blank or placeholder value for a write-only key means "keep the
+            # existing secret"; only an explicitly supplied new value replaces it.
+            if is_masked_value(configuration.key, request.data.get(configuration.key)):
+                continue
             raw_value = request.data.get(configuration.key, configuration.value)
             value = "" if raw_value is None else str(raw_value).strip()
             if configuration.is_encrypted:

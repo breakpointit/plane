@@ -41,3 +41,10 @@ from .space.password_management import (
     ResetPasswordSpaceEndpoint,
 )
 from .app.password_management import ForgotPasswordEndpoint, ResetPasswordEndpoint
+
+# Microsoft Entra ID (fork addition; appended so upstream merges stay clean)
+from .app.microsoft import MicrosoftCallbackEndpoint, MicrosoftOauthInitiateEndpoint
+from .space.microsoft import (
+    MicrosoftCallbackSpaceEndpoint,
+    MicrosoftOauthInitiateSpaceEndpoint,
+)

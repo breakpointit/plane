@@ -115,6 +115,17 @@ class InstanceEndpoint(BaseAPIView):
             ]
         )
 
+        # Microsoft Entra ID (fork addition). Read separately rather than appended to
+        # the positional tuple above so upstream changes to that tuple merge cleanly.
+        (IS_MICROSOFT_ENABLED,) = get_configuration_value(
+            [
+                {
+                    "key": "IS_MICROSOFT_ENABLED",
+                    "default": os.environ.get("IS_MICROSOFT_ENABLED", "0"),
+                }
+            ]
+        )
+
         data = {}
         # Authentication
         data["enable_signup"] = ENABLE_SIGNUP == "1"
@@ -123,6 +134,9 @@ class InstanceEndpoint(BaseAPIView):
         data["is_github_enabled"] = IS_GITHUB_ENABLED == "1"
         data["is_gitlab_enabled"] = IS_GITLAB_ENABLED == "1"
         data["is_gitea_enabled"] = IS_GITEA_ENABLED == "1"
+        # Only the availability flag is public. Tenant ID, client ID and client
+        # secret are never exposed through this endpoint.
+        data["is_microsoft_enabled"] = IS_MICROSOFT_ENABLED == "1"
         data["is_magic_login_enabled"] = ENABLE_MAGIC_LINK_LOGIN == "1"
         data["is_email_password_enabled"] = ENABLE_EMAIL_PASSWORD == "1"
 

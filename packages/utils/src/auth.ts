@@ -228,6 +228,14 @@ const errorCodeMessages: {
     title: `GitLab OAuth provider error`,
     message: () => `GitLab OAuth provider error. Please try again.`,
   },
+  [EAuthErrorCodes.MICROSOFT_NOT_CONFIGURED]: {
+    title: `Microsoft Entra ID not configured`,
+    message: () => `Microsoft Entra ID not configured. Please contact your administrator.`,
+  },
+  [EAuthErrorCodes.MICROSOFT_OAUTH_PROVIDER_ERROR]: {
+    title: `Microsoft sign-in failed`,
+    message: () => `We could not complete sign-in with Microsoft. Please try again.`,
+  },
   // Reset Password
   [EAuthErrorCodes.INVALID_PASSWORD_TOKEN]: {
     title: `Invalid password token`,
@@ -340,6 +348,8 @@ export const authErrorHandler = (errorCode: EAuthErrorCodes, email?: string): TA
     EAuthErrorCodes.GOOGLE_OAUTH_PROVIDER_ERROR,
     EAuthErrorCodes.GITHUB_OAUTH_PROVIDER_ERROR,
     EAuthErrorCodes.GITLAB_OAUTH_PROVIDER_ERROR,
+    EAuthErrorCodes.MICROSOFT_NOT_CONFIGURED,
+    EAuthErrorCodes.MICROSOFT_OAUTH_PROVIDER_ERROR,
     EAuthErrorCodes.INVALID_PASSWORD_TOKEN,
     EAuthErrorCodes.EXPIRED_PASSWORD_TOKEN,
     EAuthErrorCodes.INCORRECT_OLD_PASSWORD,
