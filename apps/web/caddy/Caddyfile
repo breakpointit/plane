@@ -9,9 +9,22 @@
 :3000 {
 	root * /usr/share/caddy/html
 
-	# Per-client-IP rate limiting for static asset requests
+	# Content-hashed build output vs. everything else. Both rules below key off
+	# this split, so keep the two matchers in sync.
+	@assets path /assets/*
+	@dynamic not path /assets/*
+
+	# Per-client-IP rate limiting, applied to navigations only.
+	#
+	# Static assets are deliberately excluded. The client bundle is split into
+	# ~1000 content-hashed chunks, so a single cold page load costs several hundred
+	# requests -- far more than any sane per-minute limit. Rate limiting them turns
+	# a first-time visit into HTTP 429s on random .js chunks and a blank app, and
+	# because the key is {client_ip}, everyone behind a shared egress IP draws from
+	# the same bucket: one colleague's first login can lock out the whole office.
 	rate_limit {
 		zone static {
+			match @dynamic
 			key {client_ip}
 			events 300
 			window 1m
@@ -24,6 +37,16 @@
 		X-Content-Type-Options "nosniff"
 		X-XSS-Protection "1; mode=block"
 	}
+
+	# Asset filenames contain a content hash, so a given URL's bytes never change
+	# and it can be cached permanently. Without this the browser gets only
+	# etag/last-modified, falls back to heuristic caching, and revalidates on every
+	# navigation -- hundreds of conditional requests per page load.
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	# index.html must always be revalidated: it carries the current asset hashes,
+	# so a stale copy points at chunks that no longer exist after a deploy.
+	header @dynamic Cache-Control "no-cache"
 
 	# SPA fallback
 	try_files {path} /index.html

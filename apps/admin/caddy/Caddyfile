@@ -9,9 +9,21 @@
 :3000 {
 	root * /usr/share/caddy/html
 
-	# Per-client-IP rate limiting for static asset requests
+	# Content-hashed build output vs. everything else. The admin build is mounted
+	# under /god-mode, but VITE_ADMIN_BASE_PATH can change that, so match both the
+	# prefixed and root-relative asset paths. Keep the two matchers in sync.
+	@assets path /god-mode/assets/* /assets/*
+	@dynamic not path /god-mode/assets/* /assets/*
+
+	# Per-client-IP rate limiting, applied to navigations only.
+	#
+	# Static assets are deliberately excluded: a cold page load fetches every
+	# content-hashed chunk at once, which trips any per-minute limit and leaves the
+	# app blank with HTTP 429s on random .js files. The key is {client_ip}, so
+	# everyone behind a shared egress IP draws from the same bucket.
 	rate_limit {
 		zone static {
+			match @dynamic
 			key {client_ip}
 			events 300
 			window 1m
@@ -24,6 +36,15 @@
 		X-Content-Type-Options "nosniff"
 		X-XSS-Protection "1; mode=block"
 	}
+
+	# Asset filenames contain a content hash, so a given URL's bytes never change
+	# and it can be cached permanently. Without this the browser gets only
+	# etag/last-modified and revalidates on every navigation.
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	# index.html must always be revalidated: it carries the current asset hashes,
+	# so a stale copy points at chunks that no longer exist after a deploy.
+	header @dynamic Cache-Control "no-cache"
 
 	# SPA fallback: the admin build is served from /god-mode
 	try_files {path} /god-mode/index.html
