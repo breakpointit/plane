@@ -417,6 +417,17 @@ class MicrosoftOAuthProvider(OauthAdapter):
             )
             raise _provider_error()
 
+        # Entra does not always issue given_name/family_name — it depends on what the
+        # directory holds for the user — but `name` is populated for organizational
+        # accounts. Fall back to it so the profile arrives complete. This matters
+        # beyond first impressions: with ENABLE_MICROSOFT_SYNC on, sync_user_data
+        # reassigns first/last name on every sign-in and writes "" when the claims
+        # are absent, which would silently wipe a name the user typed at onboarding.
+        given_name = claims.get("given_name") or ""
+        family_name = claims.get("family_name") or ""
+        if not given_name and not family_name:
+            given_name, _, family_name = (claims.get("name") or "").strip().partition(" ")
+
         # Stable, immutable external identity: tenant + object id. Email addresses
         # change and must never be the identity key.
         tenant_id = str(claims.get("tid"))
@@ -431,8 +442,8 @@ class MicrosoftOAuthProvider(OauthAdapter):
                 "user": {
                     "provider_id": f"{tenant_id}.{object_id}",
                     "email": email,
-                    "first_name": claims.get("given_name") or "",
-                    "last_name": claims.get("family_name") or "",
+                    "first_name": given_name,
+                    "last_name": family_name,
                     "display_name": claims.get("name") or "",
                     "avatar": "",
                     "is_password_autoset": True,

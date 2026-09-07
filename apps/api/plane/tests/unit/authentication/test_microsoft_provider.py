@@ -303,6 +303,52 @@ class TestUserIdentity:
         assert user["last_name"] == "User"
         assert user["is_password_autoset"] is True
 
+    def test_name_falls_back_to_the_display_name_claim(
+        self, microsoft_configuration, fake_request, id_token_claims
+    ):
+        """
+        Entra omits given_name/family_name for some directory profiles. Falling back
+        to `name` keeps the profile populated and stops ENABLE_MICROSOFT_SYNC from
+        blanking a name the user entered during onboarding.
+        """
+        provider = self._provider_with_claims(
+            fake_request, id_token_claims(given_name=None, family_name=None, name="Ada Lovelace")
+        )
+        provider.set_user_data()
+
+        assert provider.user_data["user"]["first_name"] == "Ada"
+        assert provider.user_data["user"]["last_name"] == "Lovelace"
+
+    def test_single_word_display_name_does_not_produce_a_blank_first_name(
+        self, microsoft_configuration, fake_request, id_token_claims
+    ):
+        provider = self._provider_with_claims(
+            fake_request, id_token_claims(given_name=None, family_name=None, name="Prince")
+        )
+        provider.set_user_data()
+
+        assert provider.user_data["user"]["first_name"] == "Prince"
+        assert provider.user_data["user"]["last_name"] == ""
+
+    def test_explicit_name_claims_win_over_the_fallback(
+        self, microsoft_configuration, fake_request, id_token_claims
+    ):
+        provider = self._provider_with_claims(fake_request, id_token_claims(name="Wrong Name"))
+        provider.set_user_data()
+
+        assert provider.user_data["user"]["first_name"] == "Entra"
+        assert provider.user_data["user"]["last_name"] == "User"
+
+    def test_no_name_claims_at_all_is_not_fatal(self, microsoft_configuration, fake_request, id_token_claims):
+        """A missing name is cosmetic; only a missing email may block sign-in."""
+        provider = self._provider_with_claims(
+            fake_request, id_token_claims(given_name=None, family_name=None, name=None)
+        )
+        provider.set_user_data()
+
+        assert provider.user_data["user"]["first_name"] == ""
+        assert provider.user_data["email"] == "entra.user@example.com"
+
     def test_falls_back_to_sub_when_oid_is_absent(
         self, microsoft_configuration, fake_request, id_token_claims
     ):

@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
 // plane imports
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
@@ -127,6 +127,27 @@ export const OnboardingRoot = observer(function OnboardingRoot({ invitations = [
     handleInitialStep();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Skip the profile step when it has nothing left to ask for. An SSO user arrives
+  // with their name already supplied by the identity provider, and needs no password
+  // when one is set or when password sign-in is disabled instance-wide -- so the step
+  // would only ask them to retype a name the IdP overwrites on their next sign-in.
+  // Users who genuinely have something to fill in (email/magic-code sign-ups, or an
+  // instance where a password is still required) are unaffected.
+  const hasAutoSkippedProfileSetup = useRef(false);
+  useEffect(() => {
+    if (hasAutoSkippedProfileSetup.current) return;
+    if (!user || !userProfile) return;
+    if (currentStep !== EOnboardingSteps.PROFILE_SETUP) return;
+    if (userProfile.onboarding_step?.profile_complete) return;
+
+    const hasName = Boolean(user.first_name?.trim());
+    const needsPassword = Boolean(user.is_password_autoset) && Boolean(instanceConfig?.is_email_password_enabled);
+    if (!hasName || needsPassword) return;
+
+    hasAutoSkippedProfileSetup.current = true;
+    handleStepChange(EOnboardingSteps.PROFILE_SETUP);
+  }, [user, userProfile, currentStep, instanceConfig, handleStepChange]);
 
   return (
     <div className="flex h-full flex-col">

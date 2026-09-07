@@ -139,7 +139,14 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework.authentication.SessionAuthentication",),
     "DEFAULT_THROTTLE_CLASSES": ("rest_framework.throttling.AnonRateThrottle",),
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "30/minute",
+        # Anonymous requests are throttled per client IP. The 30/minute default is
+        # unworkable for self-hosted instances where many people share one public
+        # egress IP (office NAT, VPN): a single Plane page load makes several
+        # unauthenticated API calls, and /api/instances/ is only browser-cached for
+        # 12s, so a handful of colleagues exhaust the shared budget and see
+        # RATE_LIMIT_EXCEEDED (5900). Configurable per deployment, matching the
+        # existing AUTHENTICATION_RATE_LIMIT / API_KEY_RATE_LIMIT knobs.
+        "anon": os.environ.get("ANON_RATE_LIMIT", "30/minute"),
         "asset_id": "5/minute",
     },
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
@@ -149,6 +156,26 @@ REST_FRAMEWORK = {
     # Preserve original Django URL parameter names (pk) instead of converting to 'id'
     "SCHEMA_COERCE_PATH_PK": False,
 }
+
+# Number of trusted reverse proxies in front of the API. When set, DRF picks the
+# real client IP out of X-Forwarded-For for throttling instead of hashing the whole
+# forwarded chain.
+#
+# Set it to the exact number of proxies that append to X-Forwarded-For. Both
+# directions are harmful, which is why there is no default:
+#   too low  -> DRF reads a proxy's own address, collapsing every user into a
+#               single throttle bucket
+#   too high -> DRF reads an entry the client can supply itself, letting anyone
+#               mint a fresh bucket per request and bypass throttling entirely
+# Leaving it unset keeps DRF's default behaviour, which is safe but treats
+# everyone behind one egress IP as a single client.
+NUM_PROXIES = os.environ.get("NUM_PROXIES")
+if NUM_PROXIES:
+    try:
+        REST_FRAMEWORK["NUM_PROXIES"] = int(NUM_PROXIES)
+    except ValueError:
+        # Never fail startup over a malformed value; fall back to DRF's default.
+        pass
 
 # API key throttle rate (DRF SimpleRateThrottle format, e.g. "60/minute")
 API_KEY_RATE_LIMIT = os.environ.get("API_KEY_RATE_LIMIT", "60/minute")
