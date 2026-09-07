@@ -102,6 +102,10 @@ present and the tenant ID is well formed.
 
 Once enabled, the sign-in page shows a **Continue with Microsoft** button.
 
+Turning the toggle back off both removes the button and disables the authentication
+endpoints outright — stored credentials are kept, but no one can sign in with
+Microsoft until it is re-enabled.
+
 ### Client secret handling
 
 The client secret is **write-only**. After it is saved:
@@ -237,5 +241,14 @@ configuration invalidates that cache; a hard refresh clears the client side.
 - Account association reuses Plane's existing provisioning path. Because the email
   arrives inside a signature-verified ID token from the one configured tenant, it
   carries at least the assurance of Google's `verified_email` check.
-- The initiation and callback routes are covered by Plane's existing authentication
-  rate limit (`AUTHENTICATION_RATE_LIMIT`).
+- Turning the God Mode toggle off genuinely disables the provider: `/auth/microsoft/`
+  and its callback both refuse once `IS_MICROSOFT_ENABLED` is not `1`, even if the
+  credentials are still stored and even when the URL is visited directly. (Plane's
+  other providers gate only the login button; this fails closed instead.)
+- The initiation and callback routes carry no additional per-IP rate limit, matching
+  Plane's other OAuth providers. Initiation validates no credentials — it only
+  redirects to Microsoft — and the callback is protected by a single-use, 10-minute
+  state value. A per-IP throttle here would break sign-in for every user behind a
+  shared corporate egress IP, which is the normal case for a single-tenant
+  deployment. Brute-force protection for password and magic-code sign-in is
+  unchanged and still governed by `AUTHENTICATION_RATE_LIMIT`.

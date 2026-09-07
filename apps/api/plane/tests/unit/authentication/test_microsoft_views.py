@@ -73,17 +73,6 @@ def db_microsoft_configuration(monkeypatch):
     return _apply
 
 
-@pytest.fixture
-def no_throttle(monkeypatch):
-    """Disable the shared auth throttle so repeated test requests are not rejected."""
-    monkeypatch.setattr(
-        "plane.authentication.views.app.microsoft.authentication_throttle_allows", lambda request: True
-    )
-    monkeypatch.setattr(
-        "plane.authentication.views.space.microsoft.authentication_throttle_allows", lambda request: True
-    )
-
-
 def _stub_token_endpoint(monkeypatch, id_token, extra=None):
     """Make the provider's token exchange return a fixed response."""
     payload = {"access_token": "ms-access-token", "id_token": id_token, "expires_in": 3600}
@@ -109,7 +98,7 @@ def _start_flow(client, url=INITIATE_URL):
 
 class TestInitiation:
     def test_redirects_to_configured_tenant(
-        self, client, configured_instance, db_microsoft_configuration, no_throttle
+        self, client, configured_instance, db_microsoft_configuration
     ):
         response, session = _start_flow(client)
 
@@ -132,7 +121,7 @@ class TestInitiation:
         assert isinstance(session["issued_at"], int)
 
     def test_state_and_nonce_differ_between_attempts(
-        self, client, configured_instance, db_microsoft_configuration, no_throttle
+        self, client, configured_instance, db_microsoft_configuration
     ):
         _, first = _start_flow(client)
         _, second = _start_flow(client)
@@ -141,7 +130,7 @@ class TestInitiation:
         assert first["code_verifier"] != second["code_verifier"]
 
     def test_unconfigured_provider_does_not_reach_microsoft(
-        self, client, configured_instance, db_microsoft_configuration, no_throttle
+        self, client, configured_instance, db_microsoft_configuration
     ):
         """Behaves like any other disabled/unconfigured provider: a local error redirect."""
         db_microsoft_configuration(MICROSOFT_CLIENT_SECRET="")
@@ -152,24 +141,54 @@ class TestInitiation:
         assert "error_code=5113" in response.url
         assert client.session.get("state") is None
 
-    def test_no_instance_fails_closed(self, client, db, db_microsoft_configuration, no_throttle):
+    def test_no_instance_fails_closed(self, client, db, db_microsoft_configuration):
         response = client.get(INITIATE_URL)
         assert response.status_code == 302
         assert "login.microsoftonline.com" not in response.url
         assert "error_code=5000" in response.url
 
-    def test_rate_limit_is_enforced(self, client, configured_instance, db_microsoft_configuration, monkeypatch):
-        """The route must not bypass the instance's existing abuse protections."""
-        monkeypatch.setattr(
-            "plane.authentication.views.app.microsoft.authentication_throttle_allows", lambda request: False
-        )
+    def test_disabled_provider_refuses_even_by_direct_url(
+        self, client, configured_instance, db_microsoft_configuration
+    ):
+        """
+        Turning the God Mode toggle off must actually disable the endpoint, not
+        merely hide the login button. Credentials stay configured here, so only
+        the flag is doing the work.
+        """
+        db_microsoft_configuration(IS_MICROSOFT_ENABLED="0")
         response = client.get(INITIATE_URL)
+
         assert response.status_code == 302
-        assert "error_code=5900" in response.url
         assert "login.microsoftonline.com" not in response.url
+        assert "error_code=5113" in response.url
+        assert client.session.get("state") is None
+
+    def test_disabled_provider_refuses_the_callback_too(
+        self, client, configured_instance, db_microsoft_configuration, sign_id_token, id_token_claims, monkeypatch
+    ):
+        """Disabling mid-flow must stop an in-flight authorization completing."""
+        _, session = _start_flow(client)
+        _stub_token_endpoint(monkeypatch, sign_id_token(id_token_claims(nonce=session["nonce"])))
+        db_microsoft_configuration(IS_MICROSOFT_ENABLED="0")
+
+        response = client.get(CALLBACK_URL, {"code": "auth-code", "state": session["state"]})
+        assert "error_code=5113" in response.url
+        assert not User.objects.exists()
+
+    def test_initiate_is_not_rate_limited(self, client, configured_instance, db_microsoft_configuration):
+        """
+        Parity with Google/GitHub/GitLab/Gitea: the initiation endpoint validates
+        no credentials and only redirects to Microsoft, so it carries no throttle.
+        A shared per-IP limit here would break sign-in for everyone behind one
+        corporate egress IP.
+        """
+        for _ in range(15):
+            response = client.get(INITIATE_URL)
+            assert "error_code=5900" not in response.url
+        assert "login.microsoftonline.com" in response.url
 
     def test_space_initiation_also_redirects_to_the_tenant(
-        self, client, configured_instance, db_microsoft_configuration, no_throttle
+        self, client, configured_instance, db_microsoft_configuration
     ):
         response, session = _start_flow(client, SPACE_INITIATE_URL)
         assert response.status_code == 302
@@ -185,7 +204,6 @@ class TestCallbackStateValidation:
         client,
         configured_instance,
         db_microsoft_configuration,
-        no_throttle,
         sign_id_token,
         id_token_claims,
         monkeypatch,
@@ -200,7 +218,7 @@ class TestCallbackStateValidation:
         assert User.objects.filter(email="entra.user@example.com").exists()
 
     def test_missing_state_fails(
-        self, client, configured_instance, db_microsoft_configuration, no_throttle
+        self, client, configured_instance, db_microsoft_configuration
     ):
         _start_flow(client)
         response = client.get(CALLBACK_URL, {"code": "auth-code"})
@@ -208,7 +226,7 @@ class TestCallbackStateValidation:
         assert not User.objects.exists()
 
     def test_mismatched_state_fails(
-        self, client, configured_instance, db_microsoft_configuration, no_throttle
+        self, client, configured_instance, db_microsoft_configuration
     ):
         _start_flow(client)
         response = client.get(CALLBACK_URL, {"code": "auth-code", "state": "attacker-supplied-state"})
@@ -220,7 +238,7 @@ class TestCallbackStateValidation:
         assert "error_code=5114" in response.url
 
     def test_expired_state_fails(
-        self, client, configured_instance, db_microsoft_configuration, no_throttle, monkeypatch
+        self, client, configured_instance, db_microsoft_configuration, monkeypatch
     ):
         _, session = _start_flow(client)
 
@@ -233,7 +251,7 @@ class TestCallbackStateValidation:
         assert "error_code=5114" in response.url
         assert not User.objects.exists()
 
-    def test_missing_code_fails(self, client, configured_instance, db_microsoft_configuration, no_throttle):
+    def test_missing_code_fails(self, client, configured_instance, db_microsoft_configuration):
         _, session = _start_flow(client)
         response = client.get(CALLBACK_URL, {"state": session["state"]})
         assert "error_code=5114" in response.url
@@ -243,7 +261,6 @@ class TestCallbackStateValidation:
         client,
         configured_instance,
         db_microsoft_configuration,
-        no_throttle,
         sign_id_token,
         id_token_claims,
         monkeypatch,
@@ -259,7 +276,7 @@ class TestCallbackStateValidation:
         assert "error_code=5114" in replay.url
 
     def test_session_values_are_cleared_after_a_failure(
-        self, client, configured_instance, db_microsoft_configuration, no_throttle
+        self, client, configured_instance, db_microsoft_configuration
     ):
         _start_flow(client)
         client.get(CALLBACK_URL, {"code": "auth-code", "state": "wrong"})
@@ -275,7 +292,7 @@ class TestCallbackTokenValidation:
         return session
 
     def test_token_exchange_failure_fails_closed(
-        self, client, configured_instance, db_microsoft_configuration, no_throttle, monkeypatch
+        self, client, configured_instance, db_microsoft_configuration, monkeypatch
     ):
         session = self._flow(client)
 
@@ -296,7 +313,6 @@ class TestCallbackTokenValidation:
         client,
         configured_instance,
         db_microsoft_configuration,
-        no_throttle,
         sign_id_token,
         id_token_claims,
         monkeypatch,
@@ -314,7 +330,6 @@ class TestCallbackTokenValidation:
         client,
         configured_instance,
         db_microsoft_configuration,
-        no_throttle,
         sign_id_token,
         id_token_claims,
         monkeypatch,
@@ -333,7 +348,6 @@ class TestCallbackTokenValidation:
         client,
         configured_instance,
         db_microsoft_configuration,
-        no_throttle,
         sign_id_token,
         id_token_claims,
         monkeypatch,
@@ -350,7 +364,6 @@ class TestCallbackTokenValidation:
         client,
         configured_instance,
         db_microsoft_configuration,
-        no_throttle,
         sign_id_token,
         id_token_claims,
         monkeypatch,
@@ -379,7 +392,6 @@ class TestAccountProvisioning:
         client,
         configured_instance,
         db_microsoft_configuration,
-        no_throttle,
         sign_id_token,
         id_token_claims,
         monkeypatch,
@@ -403,7 +415,6 @@ class TestAccountProvisioning:
         client,
         configured_instance,
         db_microsoft_configuration,
-        no_throttle,
         sign_id_token,
         id_token_claims,
         monkeypatch,
@@ -423,7 +434,6 @@ class TestAccountProvisioning:
         client,
         configured_instance,
         db_microsoft_configuration,
-        no_throttle,
         sign_id_token,
         id_token_claims,
         monkeypatch,
@@ -440,7 +450,6 @@ class TestAccountProvisioning:
         client,
         configured_instance,
         db_microsoft_configuration,
-        no_throttle,
         sign_id_token,
         id_token_claims,
         monkeypatch,

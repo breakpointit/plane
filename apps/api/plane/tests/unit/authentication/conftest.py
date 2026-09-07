@@ -111,6 +111,7 @@ def microsoft_configuration(monkeypatch):
     """Point get_configuration_value at an in-memory Microsoft configuration."""
 
     values = {
+        "IS_MICROSOFT_ENABLED": "1",
         "MICROSOFT_TENANT_ID": TENANT_ID,
         "MICROSOFT_CLIENT_ID": CLIENT_ID,
         "MICROSOFT_CLIENT_SECRET": CLIENT_SECRET,

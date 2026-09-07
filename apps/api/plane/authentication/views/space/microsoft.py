@@ -23,7 +23,6 @@ from plane.authentication.provider.oauth.microsoft import (
     generate_code_verifier,
     generate_nonce,
 )
-from plane.authentication.rate_limit import authentication_throttle_allows
 from plane.authentication.utils.host import base_host
 from plane.authentication.utils.login import user_login
 from plane.authentication.views.app.microsoft import (
@@ -47,16 +46,6 @@ class MicrosoftOauthInitiateSpaceEndpoint(View):
             if next_path:
                 params["next_path"] = str(validate_next_path(next_path))
             return HttpResponseRedirect(f"{base_host(request=request, is_space=True)}?{urlencode(params)}")
-
-        # Reuse the shared authentication throttle so this route is not a way
-        # around the instance's existing abuse protections.
-        if not authentication_throttle_allows(request):
-            return _error_redirect(
-                AuthenticationException(
-                    error_code=AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"],
-                    error_message="RATE_LIMIT_EXCEEDED",
-                )
-            )
 
         # Check instance configuration
         instance = Instance.objects.first()

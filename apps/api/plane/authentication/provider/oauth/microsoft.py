@@ -99,6 +99,14 @@ def _provider_error():
     )
 
 
+def is_microsoft_enabled():
+    """Whether an administrator has actually turned Microsoft authentication on."""
+    (IS_MICROSOFT_ENABLED,) = get_configuration_value(
+        [{"key": "IS_MICROSOFT_ENABLED", "default": os.environ.get("IS_MICROSOFT_ENABLED", "0")}]
+    )
+    return IS_MICROSOFT_ENABLED == "1"
+
+
 def validate_tenant_id(tenant_id):
     """
     Return the normalized tenant identifier, or raise MICROSOFT_NOT_CONFIGURED.
@@ -226,6 +234,13 @@ class MicrosoftOAuthProvider(OauthAdapter):
         code_challenge=None,
         code_verifier=None,
     ):
+        # A disabled provider must not authenticate anyone, not even via a direct
+        # URL. Checked here rather than in the views so it covers the initiation
+        # and callback endpoints of both the app and the spaces flow. Upstream's
+        # providers gate only the login button; this deliberately fails closed.
+        if not is_microsoft_enabled():
+            raise _configuration_error()
+
         (MICROSOFT_TENANT_ID, MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET) = get_configuration_value(
             [
                 {
