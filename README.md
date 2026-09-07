@@ -1,3 +1,14 @@
+> ### Modified fork
+>
+> This is a modified fork of [Plane](https://github.com/makeplane/plane), maintained at
+> [breakpointit/plane](https://github.com/breakpointit/plane). **Modified since September 2026**
+> to add native Microsoft Entra ID (single-tenant OpenID Connect) authentication —
+> see [`docs/authentication/microsoft-entra-id.md`](docs/authentication/microsoft-entra-id.md).
+>
+> Released under the **GNU Affero General Public License v3.0 only**, the same license as
+> upstream Plane. "Plane" is a trademark of Plane Software, Inc.; this fork is not
+> affiliated with, endorsed by, or supported by Plane Software, Inc.
+
 <br /><br />
 
 <p align="center">
