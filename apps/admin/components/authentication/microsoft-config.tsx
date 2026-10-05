@@ -37,13 +37,7 @@ export const MicrosoftConfiguration = observer(function MicrosoftConfiguration(p
     <>
       {isMicrosoftConfigured ? (
         <div className="flex items-center gap-4">
-          <AnchorButton
-            variant="primary"
-            size="sm"
-            nativeButton={false}
-            render={<Link href="/authentication/microsoft" />}
-            label="Edit"
-          />
+          <AnchorButton variant="primary" size="sm" render={<Link href="/authentication/microsoft" />} label="Edit" />
           <Switch
             checked={Boolean(parseInt(microsoftConfig))}
             onCheckedChange={() => {

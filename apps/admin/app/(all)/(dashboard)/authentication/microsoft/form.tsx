@@ -25,7 +25,7 @@ import { CopyField } from "@/components/common/copy-field";
 // hooks
 import { useInstance } from "@/hooks/store";
 // providers
-import { TOAST_TYPE, setToast } from "@/providers/toast";
+import { setToast } from "@plane/blocks/toast";
 
 type Props = {
   config: IFormattedInstanceConfiguration;
@@ -171,7 +171,7 @@ export function InstanceMicrosoftConfigForm(props: Props) {
     try {
       const response = await updateInstanceConfigurations(payload);
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Done!",
         message: "Your Microsoft Entra ID authentication is configured. You should test it now.",
       });
@@ -183,7 +183,7 @@ export function InstanceMicrosoftConfigForm(props: Props) {
       });
     } catch (err) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Error",
         message: (err as { error?: string })?.error ?? "Failed to save configuration",
       });

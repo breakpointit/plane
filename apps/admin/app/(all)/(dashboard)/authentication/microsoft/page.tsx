@@ -15,7 +15,7 @@ import microsoftLogo from "@/app/assets/logos/microsoft-logo.svg?url";
 import { AuthenticationMethodCard } from "@/components/authentication/authentication-method-card";
 import { PageWrapper } from "@/components/common/page-wrapper";
 import { Skeleton } from "@/components/common/skeleton";
-import { setPromiseToast } from "@/providers/toast";
+import { setPromiseToast } from "@plane/blocks/toast";
 // hooks
 import { useInstance } from "@/hooks/store";
 // types
@@ -47,8 +47,7 @@ const InstanceMicrosoftAuthenticationPage = observer(function InstanceMicrosoftA
         title: "Error",
         // The API rejects enabling Microsoft without a complete set of credentials,
         // so surface whatever reason it gave rather than a generic message.
-        // setPromiseToast types this callback with the success value, hence the cast.
-        message: (err) => (err as unknown as { error?: string })?.error ?? "Failed to save configuration",
+        message: (err: unknown) => (err as { error?: string } | undefined)?.error ?? "Failed to save configuration",
       },
     });
     await updateConfigPromise
